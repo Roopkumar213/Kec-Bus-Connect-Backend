@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: kec-busconnect-backend
+    ports:
+      - "8081:8081"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/kec_busconnect
+      - JWT_SECRET=8527D6E77D382B2943A59AF16F4F5A6D63E6F74A6E7134A2973E2F485764B296
+      - CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:6.0
+    container_name: kec-busconnect-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
