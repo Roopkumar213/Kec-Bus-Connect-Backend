@@ -1,5 +1,6 @@
 package com.kec.busconnect.security;
 
+import com.kec.busconnect.enums.Role;
 import com.kec.busconnect.model.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
