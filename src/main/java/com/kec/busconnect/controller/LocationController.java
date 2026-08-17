@@ -4,9 +4,11 @@ import com.kec.busconnect.dto.BusLocationResponse;
 import com.kec.busconnect.dto.LocationRequest;
 import com.kec.busconnect.model.Bus;
 import com.kec.busconnect.model.BusLocation;
+import com.kec.busconnect.model.Trip;
 import com.kec.busconnect.security.UserPrincipal;
 import com.kec.busconnect.service.BusService;
 import com.kec.busconnect.service.LocationService;
+import com.kec.busconnect.service.TripService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,10 +20,12 @@ public class LocationController {
 
     private final LocationService locationService;
     private final BusService busService;
+    private final TripService tripService;
 
-    public LocationController(LocationService locationService, BusService busService) {
+    public LocationController(LocationService locationService, BusService busService, TripService tripService) {
         this.locationService = locationService;
         this.busService = busService;
+        this.tripService = tripService;
     }
 
     @GetMapping("/location")
@@ -75,14 +79,17 @@ public class LocationController {
     }
 
     @PostMapping("/start")
-    public ResponseEntity<Bus> startTrip(@PathVariable String busId, @AuthenticationPrincipal UserPrincipal principal) {
-        Bus bus = locationService.startTrip(busId, principal.getUser());
-        return ResponseEntity.ok(bus);
+    public ResponseEntity<Trip> startTrip(@PathVariable String busId, @AuthenticationPrincipal UserPrincipal principal) {
+        Trip trip = tripService.startTrip(busId, principal.getUser());
+        return ResponseEntity.ok(trip);
     }
 
     @PostMapping("/stop")
-    public ResponseEntity<Bus> stopTrip(@PathVariable String busId, @AuthenticationPrincipal UserPrincipal principal) {
-        Bus bus = locationService.stopTrip(busId, principal.getUser());
-        return ResponseEntity.ok(bus);
+    public ResponseEntity<Trip> stopTrip(@PathVariable String busId, @AuthenticationPrincipal UserPrincipal principal) {
+        // If busId is passed, find active trip or stop by id
+        Trip trip = tripService.getActiveTripForBus(busId)
+                .map(t -> tripService.stopTrip(t.getId(), principal.getUser()))
+                .orElseGet(() -> tripService.stopTrip(busId, principal.getUser()));
+        return ResponseEntity.ok(trip);
     }
 }

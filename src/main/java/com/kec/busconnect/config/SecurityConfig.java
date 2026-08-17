@@ -44,9 +44,12 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/routes", "/api/routes/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/buses", "/api/buses/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/buses/{busId}/location").hasAnyRole("ADMIN", "TRACKER", "DRIVER")
-                .requestMatchers(HttpMethod.POST, "/api/buses/{busId}/start").hasAnyRole("ADMIN", "TRACKER", "DRIVER")
-                .requestMatchers(HttpMethod.POST, "/api/buses/{busId}/stop").hasAnyRole("ADMIN", "TRACKER", "DRIVER")
+                .requestMatchers("/api/driver/**").hasAnyRole("DRIVER", "ADMIN")
+                .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN")
+                .requestMatchers("/api/students/**").hasAnyRole("STUDENT", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/buses/{busId}/location").hasAnyRole("ADMIN", "DRIVER")
+                .requestMatchers(HttpMethod.POST, "/api/buses/{busId}/start").hasAnyRole("ADMIN", "DRIVER")
+                .requestMatchers(HttpMethod.POST, "/api/buses/{busId}/stop").hasAnyRole("ADMIN", "DRIVER")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()
             )
@@ -60,11 +63,6 @@ public class SecurityConfig {
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
@@ -75,5 +73,10 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }

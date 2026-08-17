@@ -1,10 +1,16 @@
 package com.kec.busconnect.controller;
 
+import com.kec.busconnect.dto.BoardingLocationRequest;
+import com.kec.busconnect.enums.PassengerStatus;
+import com.kec.busconnect.model.PassengerConfirmation;
 import com.kec.busconnect.model.Student;
 import com.kec.busconnect.security.UserPrincipal;
 import com.kec.busconnect.service.LocationService;
 import com.kec.busconnect.service.StudentService;
+import com.kec.busconnect.service.TripService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,41 +18,98 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/students")
+@RequestMapping
 public class StudentController {
 
     private final StudentService studentService;
     private final LocationService locationService;
+    private final TripService tripService;
 
-    public StudentController(StudentService studentService, LocationService locationService) {
+    public StudentController(StudentService studentService, LocationService locationService, TripService tripService) {
         this.studentService = studentService;
         this.locationService = locationService;
+        this.tripService = tripService;
     }
 
-    @GetMapping("/me")
+    @GetMapping("/api/students/me")
     public ResponseEntity<Student> getMyProfile(@AuthenticationPrincipal UserPrincipal principal) {
         Student student = studentService.getProfileByUserId(principal.getUser().getId());
         return ResponseEntity.ok(student);
     }
 
-    @PutMapping("/me")
+    @PutMapping("/api/students/me")
     public ResponseEntity<Student> updateMyProfile(@AuthenticationPrincipal UserPrincipal principal, @RequestBody Student updatedFields) {
         Student student = studentService.updateProfile(principal.getUser().getId(), updatedFields);
         return ResponseEntity.ok(student);
     }
 
-    @PostMapping("/board/{busId}")
-    public ResponseEntity<Map<String, Object>> confirmBoarding(
+    @GetMapping("/api/student/boarding-location")
+    public ResponseEntity<Map<String, Object>> getBoardingLocation(@AuthenticationPrincipal UserPrincipal principal) {
+        Map<String, Object> location = studentService.getBoardingLocation(principal.getUser().getId());
+        return ResponseEntity.ok(location);
+    }
+
+    @PutMapping("/api/student/boarding-location")
+    public ResponseEntity<Student> updateBoardingLocation(
+            @Valid @RequestBody BoardingLocationRequest request,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        Student updated = studentService.updateBoardingLocation(principal.getUser().getId(), request);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/api/student/boarding-location")
+    public ResponseEntity<Student> saveBoardingLocation(
+            @Valid @RequestBody BoardingLocationRequest request,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        Student updated = studentService.updateBoardingLocation(principal.getUser().getId(), request);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/api/student/trips/{tripId}/confirm")
+    public ResponseEntity<PassengerConfirmation> confirmOnBus(
+            @PathVariable String tripId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        PassengerConfirmation confirmation = tripService.updatePassengerStatus(
+                tripId,
+                principal.getUser().getId(),
+                PassengerStatus.CONFIRMED_ON_BUS
+        );
+        return ResponseEntity.ok(confirmation);
+    }
+
+    @PostMapping("/api/student/trips/{tripId}/not-on-bus")
+    public ResponseEntity<PassengerConfirmation> notOnBus(
+            @PathVariable String tripId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        PassengerConfirmation confirmation = tripService.updatePassengerStatus(
+                tripId,
+                principal.getUser().getId(),
+                PassengerStatus.NOT_ON_BUS
+        );
+        return ResponseEntity.ok(confirmation);
+    }
+
+    @PostMapping("/api/students/board/{busId}")
+    public ResponseEntity<Map<String, Object>> legacyConfirmBoarding(
             @PathVariable String busId,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
         Student student = studentService.getProfileByUserId(principal.getUser().getId());
-        boolean boarded = locationService.recordStudentBoarding(busId, student.getId());
+        boolean boarded = locationService.getActiveTripForBus(busId).isPresent();
+        if (boarded) {
+            tripService.getActiveTripForBus(busId).ifPresent(trip -> {
+                tripService.updatePassengerStatus(trip.getId(), principal.getUser().getId(), PassengerStatus.CONFIRMED_ON_BUS);
+            });
+        }
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("boarded", boarded);
-        response.put("message", "Boarding status confirmed for bus " + busId);
+        response.put("message", "Boarding status recorded for bus " + busId);
         return ResponseEntity.ok(response);
     }
 }

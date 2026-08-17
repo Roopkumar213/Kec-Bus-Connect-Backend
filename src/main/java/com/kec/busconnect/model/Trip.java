@@ -9,7 +9,9 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -35,6 +37,12 @@ public class Trip {
     private Instant endTime;
 
     private Set<String> boardedStudentIds = new HashSet<>();
+
+    private List<PassengerConfirmation> passengerConfirmations = new ArrayList<>();
+
+    private boolean passengerRequestActive = false;
+
+    private Instant passengerRequestTimestamp;
 
     private GeoPoint lastLocation;
 

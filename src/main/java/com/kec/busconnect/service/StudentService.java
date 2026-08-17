@@ -1,9 +1,15 @@
 package com.kec.busconnect.service;
 
+import com.kec.busconnect.dto.BoardingLocationRequest;
 import com.kec.busconnect.exception.ResourceNotFoundException;
+import com.kec.busconnect.model.GeoPoint;
 import com.kec.busconnect.model.Student;
 import com.kec.busconnect.repository.StudentRepository;
 import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class StudentService {
@@ -39,5 +45,29 @@ public class StudentService {
         }
 
         return studentRepository.save(student);
+    }
+
+    public Student updateBoardingLocation(String userId, BoardingLocationRequest request) {
+        Student student = getProfileByUserId(userId);
+        
+        // MongoDB GeoJSON Point: [longitude, latitude]
+        GeoPoint point = new GeoPoint(
+                "Point",
+                Arrays.asList(request.getLongitude(), request.getLatitude())
+        );
+        student.setBoardingLocation(point);
+        return studentRepository.save(student);
+    }
+
+    public Map<String, Object> getBoardingLocation(String userId) {
+        Student student = getProfileByUserId(userId);
+        Map<String, Object> map = new HashMap<>();
+        if (student.getBoardingLocation() != null && student.getBoardingLocation().getCoordinates() != null && student.getBoardingLocation().getCoordinates().size() >= 2) {
+            map.put("longitude", student.getBoardingLocation().getCoordinates().get(0));
+            map.put("latitude", student.getBoardingLocation().getCoordinates().get(1));
+        }
+        map.put("assignedBus", student.getAssignedBus());
+        map.put("assignedRoute", student.getAssignedRoute());
+        return map;
     }
 }

@@ -58,14 +58,14 @@ public class DataInitializer implements CommandLineRunner {
         userRepository.save(driverUser);
         System.out.println("Default driver user created/updated (email: driver@kec.ac.in / password: password).");
 
-        // Always ensure tracker user exists
+        // Always ensure backup driver user exists
         User trackerUser = userRepository.findByEmail("tracker@kec.ac.in").orElse(new User());
         trackerUser.setEmail("tracker@kec.ac.in");
         trackerUser.setPasswordHash(passwordEncoder.encode("password"));
-        trackerUser.setRole(Role.TRACKER);
+        trackerUser.setRole(Role.DRIVER);
         trackerUser.setActive(true);
         userRepository.save(trackerUser);
-        System.out.println("Default tracker user created/updated (email: tracker@kec.ac.in / password: password).");
+        System.out.println("Default driver assistant created/updated (email: tracker@kec.ac.in / password: password).");
 
         // Remove legacy buses and routes to ensure only Bus KEC-07 and Attikuppam route remain active
         busRepository.findAll().forEach(bus -> {
