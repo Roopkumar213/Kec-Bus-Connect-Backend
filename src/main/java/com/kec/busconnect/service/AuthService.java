@@ -123,10 +123,11 @@ public class AuthService {
         User user = principal.getUser();
         String token = jwtService.generateToken(principal);
 
+        String roleName = (user.getRole() == Role.TRACKER || user.getRole() == Role.DRIVER) ? "DRIVER" : user.getRole().name();
         AuthResponse.UserDto userDto = new AuthResponse.UserDto(
                 user.getId(),
                 user.getEmail(),
-                user.getRole().name()
+                roleName
         );
 
         return new AuthResponse(true, "Login successful", token, userDto);
