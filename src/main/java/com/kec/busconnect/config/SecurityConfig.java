@@ -26,18 +26,23 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
+    private final org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, UserDetailsService userDetailsService) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, 
+                          UserDetailsService userDetailsService,
+                          org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
+        this.corsConfigurationSource = corsConfigurationSource;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
-            .cors(cors -> cors.configure(http))
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/auth/student/signup", "/api/auth/login", "/api/auth/**").permitAll()
                 .requestMatchers("/ws/**", "/ws").permitAll()
                 .requestMatchers("/api/geocoding/**").permitAll()
