@@ -1,5 +1,6 @@
 package com.kec.busconnect.model;
 
+import com.kec.busconnect.enums.TripDirection;
 import com.kec.busconnect.enums.TripStatus;
 import lombok.Data;
 import org.springframework.data.annotation.CreatedDate;
@@ -31,6 +32,10 @@ public class Trip {
     private String routeId;
 
     private TripStatus status = TripStatus.ACTIVE;
+
+    private TripDirection direction = TripDirection.MORNING;
+
+    private Set<String> remindedStudentIds = new HashSet<>();
 
     private Instant startTime;
 

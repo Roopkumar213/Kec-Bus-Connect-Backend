@@ -67,6 +67,39 @@ public class StudentController {
         return ResponseEntity.ok(updated);
     }
 
+    @PutMapping("/api/student/evening-drop-location")
+    public ResponseEntity<Student> updateEveningDropLocation(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        Double lat = body.get("latitude") != null ? Double.valueOf(body.get("latitude").toString()) : null;
+        Double lng = body.get("longitude") != null ? Double.valueOf(body.get("longitude").toString()) : null;
+        Double acc = body.get("accuracy") != null ? Double.valueOf(body.get("accuracy").toString()) : 10.0;
+        String address = body.get("addressName") != null ? body.get("addressName").toString() : null;
+
+        if (lat == null || lng == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        BoardingLocationRequest req = new BoardingLocationRequest();
+        req.setLatitude(lat);
+        req.setLongitude(lng);
+        req.setAccuracy(acc);
+
+        Student updated = studentService.updateEveningDropLocation(principal.getUser().getId(), req, address);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PutMapping("/api/student/reminder-settings")
+    public ResponseEntity<Student> updateReminderSettings(
+            @RequestBody Map<String, Integer> body,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        int minutes = body.getOrDefault("reminderMinutes", 10);
+        Student updated = studentService.updateReminderMinutes(principal.getUser().getId(), minutes);
+        return ResponseEntity.ok(updated);
+    }
+
     @PostMapping("/api/student/trips/{tripId}/confirm")
     public ResponseEntity<PassengerConfirmation> confirmOnBus(
             @PathVariable String tripId,
