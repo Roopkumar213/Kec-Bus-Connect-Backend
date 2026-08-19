@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+import com.kec.busconnect.enums.TripDirection;
+
 @RestController
 @RequestMapping("/api/driver")
 @PreAuthorize("hasAnyRole('DRIVER', 'ADMIN')")
@@ -36,20 +38,32 @@ public class DriverController {
     public ResponseEntity<Trip> startTrip(
             @RequestBody(required = false) Map<String, String> body,
             @RequestParam(required = false) String busId,
+            @RequestParam(required = false) String direction,
             @AuthenticationPrincipal UserPrincipal principal
     ) {
         String targetBusId = busId;
-        if (targetBusId == null && body != null) {
-            targetBusId = body.get("busId");
+        String dirStr = direction;
+        if (body != null) {
             if (targetBusId == null) {
-                targetBusId = body.get("busNumber");
+                targetBusId = body.get("busId");
+                if (targetBusId == null) {
+                    targetBusId = body.get("busNumber");
+                }
+            }
+            if (dirStr == null) {
+                dirStr = body.get("direction");
             }
         }
         if (targetBusId == null) {
             targetBusId = "KEC-07"; // default if not specified
         }
 
-        Trip trip = tripService.startTrip(targetBusId, principal.getUser());
+        TripDirection tripDirection = TripDirection.MORNING;
+        if (dirStr != null && "EVENING".equalsIgnoreCase(dirStr.trim())) {
+            tripDirection = TripDirection.EVENING;
+        }
+
+        Trip trip = tripService.startTrip(targetBusId, principal.getUser(), tripDirection);
         return ResponseEntity.ok(trip);
     }
 

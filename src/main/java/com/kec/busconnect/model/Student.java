@@ -39,6 +39,13 @@ public class Student {
     @GeoSpatialIndexed
     private GeoPoint boardingLocation;
     
+    @GeoSpatialIndexed
+    private GeoPoint eveningDropLocation;
+    
+    private String eveningDropAddress;
+    
+    private Integer reminderMinutes = 10;
+    
     private String assignedRoute;
     private String assignedBus;
     

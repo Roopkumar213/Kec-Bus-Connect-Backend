@@ -4,14 +4,18 @@ import com.kec.busconnect.dto.PassengerSummaryResponse;
 import com.kec.busconnect.enums.BusStatus;
 import com.kec.busconnect.enums.PassengerStatus;
 import com.kec.busconnect.enums.Role;
+import com.kec.busconnect.enums.TripDirection;
 import com.kec.busconnect.enums.TripStatus;
 import com.kec.busconnect.exception.BadRequestException;
 import com.kec.busconnect.exception.ResourceNotFoundException;
 import com.kec.busconnect.model.Bus;
+import com.kec.busconnect.model.BusLocation;
+import com.kec.busconnect.model.GeoPoint;
 import com.kec.busconnect.model.PassengerConfirmation;
 import com.kec.busconnect.model.Student;
 import com.kec.busconnect.model.Trip;
 import com.kec.busconnect.model.User;
+import com.kec.busconnect.repository.BusLocationRepository;
 import com.kec.busconnect.repository.BusRepository;
 import com.kec.busconnect.repository.StudentRepository;
 import com.kec.busconnect.repository.TripRepository;
@@ -27,15 +31,18 @@ public class TripService {
 
     private final TripRepository tripRepository;
     private final BusRepository busRepository;
+    private final BusLocationRepository busLocationRepository;
     private final StudentRepository studentRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     public TripService(TripRepository tripRepository,
                        BusRepository busRepository,
+                       BusLocationRepository busLocationRepository,
                        StudentRepository studentRepository,
                        SimpMessagingTemplate messagingTemplate) {
         this.tripRepository = tripRepository;
         this.busRepository = busRepository;
+        this.busLocationRepository = busLocationRepository;
         this.studentRepository = studentRepository;
         this.messagingTemplate = messagingTemplate;
     }
@@ -50,6 +57,11 @@ public class TripService {
 
     @Transactional
     public Trip startTrip(String busId, User currentUser) {
+        return startTrip(busId, currentUser, TripDirection.MORNING);
+    }
+
+    @Transactional
+    public Trip startTrip(String busId, User currentUser, TripDirection direction) {
         Bus bus = busRepository.findById(busId)
                 .orElseGet(() -> busRepository.findByBusNumber(busId)
                         .orElseThrow(() -> new ResourceNotFoundException("Bus not found with identifier: " + busId)));
@@ -60,12 +72,21 @@ public class TripService {
             }
         }
 
+        TripDirection effectiveDirection = direction != null ? direction : TripDirection.MORNING;
+
         // Check if active trip already exists
         Optional<Trip> existing = tripRepository.findFirstByBusIdAndStatus(bus.getId(), TripStatus.ACTIVE);
         if (existing.isPresent()) {
+            Trip existingTrip = existing.get();
+            // If direction is explicitly provided and different, update it
+            if (direction != null && existingTrip.getDirection() != direction) {
+                existingTrip.setDirection(direction);
+                existingTrip.setLastUpdated(Instant.now());
+                existingTrip = tripRepository.save(existingTrip);
+            }
             bus.setStatus(BusStatus.RUNNING);
             busRepository.save(bus);
-            return existing.get();
+            return existingTrip;
         }
 
         bus.setStatus(BusStatus.RUNNING);
@@ -77,9 +98,33 @@ public class TripService {
         trip.setDriverId(currentUser.getId());
         trip.setRouteId(bus.getRouteId());
         trip.setStatus(TripStatus.ACTIVE);
+        trip.setDirection(effectiveDirection);
+        trip.setRemindedStudentIds(new HashSet<>());
         trip.setStartTime(Instant.now());
         trip.setLastUpdated(Instant.now());
         trip.setPassengerRequestActive(false);
+
+        // Set initial starting coordinates based on Trip Direction
+        // For EVENING: starts from College (KEC: [78.360311, 12.721662])
+        // For MORNING: starts from Attikuppam Origin ([78.479812, 12.884713])
+        GeoPoint startPoint = (effectiveDirection == TripDirection.EVENING)
+                ? new GeoPoint("Point", Arrays.asList(78.360311, 12.721662))
+                : new GeoPoint("Point", Arrays.asList(78.479812, 12.884713));
+
+        trip.setLastLocation(startPoint);
+        trip.setLastSpeed(0.0);
+        trip.setLastAccuracy(8.0);
+        trip.setLastHeading(0.0);
+
+        // Update busLocation record as well
+        BusLocation busLocation = busLocationRepository.findByBusId(bus.getId()).orElse(new BusLocation());
+        busLocation.setBusId(bus.getId());
+        busLocation.setLocation(startPoint);
+        busLocation.setAccuracy(8.0);
+        busLocation.setSpeed(0.0);
+        busLocation.setHeading(0.0);
+        busLocation.setUpdatedAt(Instant.now());
+        busLocationRepository.save(busLocation);
 
         // Pre-populate passenger list with assigned students
         List<Student> assignedStudents = studentRepository.findByAssignedBus(bus.getId());

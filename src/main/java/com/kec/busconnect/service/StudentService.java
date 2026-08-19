@@ -59,6 +59,26 @@ public class StudentService {
         return studentRepository.save(student);
     }
 
+    public Student updateEveningDropLocation(String userId, BoardingLocationRequest request, String addressName) {
+        Student student = getProfileByUserId(userId);
+        
+        GeoPoint point = new GeoPoint(
+                "Point",
+                Arrays.asList(request.getLongitude(), request.getLatitude())
+        );
+        student.setEveningDropLocation(point);
+        if (addressName != null && !addressName.trim().isEmpty()) {
+            student.setEveningDropAddress(addressName.trim());
+        }
+        return studentRepository.save(student);
+    }
+
+    public Student updateReminderMinutes(String userId, int minutes) {
+        Student student = getProfileByUserId(userId);
+        student.setReminderMinutes(Math.max(1, Math.min(30, minutes)));
+        return studentRepository.save(student);
+    }
+
     public Map<String, Object> getBoardingLocation(String userId) {
         Student student = getProfileByUserId(userId);
         Map<String, Object> map = new HashMap<>();
@@ -66,6 +86,12 @@ public class StudentService {
             map.put("longitude", student.getBoardingLocation().getCoordinates().get(0));
             map.put("latitude", student.getBoardingLocation().getCoordinates().get(1));
         }
+        if (student.getEveningDropLocation() != null && student.getEveningDropLocation().getCoordinates() != null && student.getEveningDropLocation().getCoordinates().size() >= 2) {
+            map.put("eveningLongitude", student.getEveningDropLocation().getCoordinates().get(0));
+            map.put("eveningLatitude", student.getEveningDropLocation().getCoordinates().get(1));
+            map.put("eveningDropAddress", student.getEveningDropAddress());
+        }
+        map.put("reminderMinutes", student.getReminderMinutes() != null ? student.getReminderMinutes() : 10);
         map.put("assignedBus", student.getAssignedBus());
         map.put("assignedRoute", student.getAssignedRoute());
         return map;

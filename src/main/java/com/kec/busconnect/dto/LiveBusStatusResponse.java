@@ -29,4 +29,7 @@ public class LiveBusStatusResponse {
     private Double etaMinutesToNextStop;
     private String activeTripId;
     private boolean passengerRequestActive;
+    private String direction; // MORNING, EVENING
+    private String startingPoint;
+    private String destination;
 }
