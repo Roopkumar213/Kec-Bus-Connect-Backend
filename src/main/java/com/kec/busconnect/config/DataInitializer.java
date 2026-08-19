@@ -49,14 +49,28 @@ public class DataInitializer implements CommandLineRunner {
             try {
                 adminUser = userRepository.findByEmail("admin@kec.ac.in").orElse(new User());
                 adminUser.setEmail("admin@kec.ac.in");
-                adminUser.setPasswordHash(passwordEncoder.encode("admin123"));
+                adminUser.setPasswordHash(passwordEncoder.encode("Roop@210307"));
                 adminUser.setRole(Role.ADMIN);
                 adminUser.setActive(true);
                 userRepository.save(adminUser);
-                System.out.println("Default admin user verified (admin@kec.ac.in).");
+                System.out.println("Default admin user verified (admin@kec.ac.in / Roop@210307).");
             } catch (Exception e) {
                 System.out.println("Notice: admin initialization: " + e.getMessage());
             }
+
+            // Also seed a shorthand admin login with username "admin"
+            try {
+                User shortAdmin = userRepository.findByEmail("admin").orElse(new User());
+                shortAdmin.setEmail("admin");
+                shortAdmin.setPasswordHash(passwordEncoder.encode("Roop@210307"));
+                shortAdmin.setRole(Role.ADMIN);
+                shortAdmin.setActive(true);
+                userRepository.save(shortAdmin);
+                System.out.println("Shorthand admin login seeded (admin / Roop@210307).");
+            } catch (Exception e) {
+                System.out.println("Notice: shorthand admin initialization: " + e.getMessage());
+            }
+
 
             // Always ensure default driver user exists
             User driverUser = null;
