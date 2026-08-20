@@ -52,7 +52,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/driver/**").hasAnyRole("DRIVER", "ADMIN")
                 .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN")
                 .requestMatchers("/api/students/**").hasAnyRole("STUDENT", "ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/buses/{busId}/location").hasAnyRole("ADMIN", "DRIVER")
+                .requestMatchers(HttpMethod.POST, "/api/buses/{busId}/location").hasAnyRole("ADMIN", "DRIVER", "STUDENT")
                 .requestMatchers(HttpMethod.POST, "/api/buses/{busId}/start").hasAnyRole("ADMIN", "DRIVER")
                 .requestMatchers(HttpMethod.POST, "/api/buses/{busId}/stop").hasAnyRole("ADMIN", "DRIVER")
                 .requestMatchers("/api/**").authenticated()

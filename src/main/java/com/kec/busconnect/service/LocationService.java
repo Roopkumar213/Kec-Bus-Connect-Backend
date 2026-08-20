@@ -188,7 +188,10 @@ public class LocationService {
             }
         }
 
-        return new LiveBusStatusResponse(
+        // Retrieve sourceType from the stored BusLocation
+        String sourceType = (loc != null) ? loc.getSourceType() : null;
+
+        LiveBusStatusResponse resp = new LiveBusStatusResponse(
                 bus.getId(),
                 bus.getBusNumber(),
                 bus.getRegistrationNumber(),
@@ -210,8 +213,10 @@ public class LocationService {
                 activeTrip.map(Trip::isPassengerRequestActive).orElse(false),
                 direction.name(),
                 startingPoint,
-                destination
+                destination,
+                sourceType
         );
+        return resp;
     }
 
     @Transactional
@@ -220,18 +225,31 @@ public class LocationService {
                 .orElseGet(() -> busRepository.findByBusNumber(busId)
                         .orElseThrow(() -> new ResourceNotFoundException("Bus not found: " + busId)));
 
-        if (currentUser.getRole() != Role.ADMIN) {
-            if (bus.getTrackerId() == null || !bus.getTrackerId().equals(currentUser.getId())) {
-                throw new BadRequestException("You are not authorized to update coordinates for this bus");
-            }
-        }
-
         BusLocation busLocation = busLocationRepository.findByBusId(bus.getId())
                 .orElseGet(() -> {
                     BusLocation loc = new BusLocation();
                     loc.setBusId(bus.getId());
                     return loc;
                 });
+
+        String callerSourceType;
+
+        if (currentUser.getRole() == Role.ADMIN) {
+            // ADMIN: always allowed
+            callerSourceType = "ADMIN";
+        } else if (currentUser.getRole() == Role.DRIVER || currentUser.getRole() == Role.TRACKER) {
+            // DRIVER: must be the assigned tracker for this bus
+            if (bus.getTrackerId() == null || !bus.getTrackerId().equals(currentUser.getId())) {
+                throw new BadRequestException("You are not authorized to update coordinates for this bus");
+            }
+            callerSourceType = "DRIVER";
+        } else if (currentUser.getRole() == Role.STUDENT) {
+            // STUDENT: full authorization check
+            validateStudentLocationShare(bus, busLocation, currentUser);
+            callerSourceType = "STUDENT";
+        } else {
+            throw new BadRequestException("You are not authorized to update bus location");
+        }
 
         // Compute speed fallback if GPS speed is null or 0
         Double calculatedSpeed = request.getSpeed();
@@ -259,6 +277,8 @@ public class LocationService {
         busLocation.setSpeed(calculatedSpeed);
         busLocation.setHeading(request.getHeading());
         busLocation.setUpdatedAt(now);
+        busLocation.setSourceType(callerSourceType);
+        busLocation.setSourceUserId(currentUser.getId());
 
         if (bus.getStatus() == BusStatus.NOT_STARTED || bus.getStatus() == BusStatus.OFFLINE) {
             bus.setStatus(BusStatus.RUNNING);
@@ -294,6 +314,118 @@ public class LocationService {
         }
 
         return savedLocation;
+    }
+
+    /**
+     * Validates that a student is allowed to share location for the given bus.
+     * Throws BadRequestException if not authorized.
+     * Priority: DRIVER > ADMIN > STUDENT.
+     */
+    private void validateStudentLocationShare(Bus bus, BusLocation busLocation, User student) {
+        // 1. Bus must have an active trip
+        Optional<Trip> activeTrip = tripRepository.findFirstByBusIdAndStatus(bus.getId(), TripStatus.ACTIVE);
+        if (activeTrip.isEmpty()) {
+            throw new BadRequestException("No active trip for this bus. Cannot share location.");
+        }
+
+        // 2. Student must be assigned to this bus
+        Optional<Student> studentProfile = studentRepository.findByUserId(student.getId());
+        if (studentProfile.isEmpty()) {
+            throw new BadRequestException("Student profile not found.");
+        }
+        Student s = studentProfile.get();
+        boolean assignedToThisBus = bus.getId().equals(s.getAssignedBus())
+                || bus.getBusNumber().equals(s.getAssignedBus());
+        if (!assignedToThisBus) {
+            throw new BadRequestException("You are not assigned to this bus.");
+        }
+
+        // 3. Check that no higher-priority source is currently active (within last 60 seconds)
+        if (busLocation.getUpdatedAt() != null) {
+            long secondsOld = Duration.between(busLocation.getUpdatedAt(), Instant.now()).getSeconds();
+            if (secondsOld <= 60) {
+                String existingSource = busLocation.getSourceType();
+                if ("DRIVER".equals(existingSource)) {
+                    throw new BadRequestException("Driver is currently sharing the bus location. You cannot override the driver's GPS.");
+                }
+                if ("ADMIN".equals(existingSource)) {
+                    throw new BadRequestException("An admin is currently managing the bus location.");
+                }
+                // Another student is sharing
+                if ("STUDENT".equals(existingSource)
+                        && busLocation.getSourceUserId() != null
+                        && !busLocation.getSourceUserId().equals(student.getId())) {
+                    throw new BadRequestException("Bus location is already being shared by another passenger.");
+                }
+            }
+        }
+    }
+
+    /**
+     * Clears the student as the active location source if they are the current source.
+     * Called when a student explicitly clicks "Stop Sharing".
+     */
+    @Transactional
+    public void clearStudentLocationSource(String busId, User student) {
+        Bus bus = busRepository.findById(busId)
+                .orElseGet(() -> busRepository.findByBusNumber(busId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Bus not found: " + busId)));
+
+        busLocationRepository.findByBusId(bus.getId()).ifPresent(loc -> {
+            if ("STUDENT".equals(loc.getSourceType())
+                    && student.getId().equals(loc.getSourceUserId())) {
+                loc.setSourceType(null);
+                loc.setSourceUserId(null);
+                busLocationRepository.save(loc);
+            }
+        });
+    }
+
+    /**
+     * Returns the current location source info for a bus.
+     * Returns a map with: sourceType (DRIVER/ADMIN/STUDENT/null), canStudentShare (boolean).
+     */
+    public Map<String, Object> getLocationSourceStatus(String busId, User requestingUser) {
+        Bus bus = busRepository.findById(busId)
+                .orElseGet(() -> busRepository.findByBusNumber(busId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Bus not found: " + busId)));
+
+        Optional<Trip> activeTrip = tripRepository.findFirstByBusIdAndStatus(bus.getId(), TripStatus.ACTIVE);
+        BusLocation loc = busLocationRepository.findByBusId(bus.getId()).orElse(null);
+
+        String currentSource = null;
+        boolean isStudentCurrentSource = false;
+
+        if (loc != null && loc.getUpdatedAt() != null) {
+            long secondsOld = Duration.between(loc.getUpdatedAt(), Instant.now()).getSeconds();
+            if (secondsOld <= 60) {
+                currentSource = loc.getSourceType();
+                isStudentCurrentSource = "STUDENT".equals(currentSource)
+                        && requestingUser.getId().equals(loc.getSourceUserId());
+            }
+        }
+
+        boolean canShare = false;
+        if (activeTrip.isPresent() && requestingUser.getRole() == Role.STUDENT) {
+            Optional<Student> sp = studentRepository.findByUserId(requestingUser.getId());
+            if (sp.isPresent()) {
+                Student s = sp.get();
+                boolean assigned = bus.getId().equals(s.getAssignedBus()) || bus.getBusNumber().equals(s.getAssignedBus());
+                boolean driverBlocking = "DRIVER".equals(currentSource) || "ADMIN".equals(currentSource);
+                boolean otherStudentBlocking = "STUDENT".equals(currentSource)
+                        && !requestingUser.getId().equals(loc != null ? loc.getSourceUserId() : null);
+                canShare = assigned && !driverBlocking && !otherStudentBlocking;
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("busId", bus.getId());
+        result.put("busNumber", bus.getBusNumber());
+        result.put("activeTripExists", activeTrip.isPresent());
+        result.put("currentSource", currentSource);
+        result.put("isCurrentSource", isStudentCurrentSource);
+        result.put("canStudentShare", canShare);
+        return result;
     }
 
     private void checkAndTriggerArrivalReminders(Trip trip, Bus bus, double currentLat, double currentLng, double currentSpeed) {
