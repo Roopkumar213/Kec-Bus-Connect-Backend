@@ -32,4 +32,10 @@ public class LiveBusStatusResponse {
     private String direction; // MORNING, EVENING
     private String startingPoint;
     private String destination;
+    /**
+     * Who is providing this bus's live location: "DRIVER", "ADMIN", or "STUDENT".
+     * Null means the source is unknown (legacy). No personal user info is exposed.
+     */
+    private String sourceType;
 }
+

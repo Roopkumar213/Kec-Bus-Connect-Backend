@@ -145,4 +145,42 @@ public class StudentController {
         response.put("message", "Boarding status recorded for bus " + busId);
         return ResponseEntity.ok(response);
     }
+
+    // =========================================================
+    // Student Live Location Sharing endpoints
+    // =========================================================
+
+    /**
+     * GET /api/student/location/status?busId={busId}
+     * Returns whether the student can share location for the specified bus,
+     * and who the current location source is.
+     */
+    @GetMapping("/api/student/location/status")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    public ResponseEntity<Map<String, Object>> getLocationShareStatus(
+            @RequestParam String busId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        Map<String, Object> status = locationService.getLocationSourceStatus(busId, principal.getUser());
+        return ResponseEntity.ok(status);
+    }
+
+    /**
+     * POST /api/student/location/stop?busId={busId}
+     * Clears the student as the active location source for the bus.
+     * Safe to call even if the student is not currently sharing.
+     */
+    @PostMapping("/api/student/location/stop")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
+    public ResponseEntity<Map<String, Object>> stopLocationSharing(
+            @RequestParam String busId,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        locationService.clearStudentLocationSource(busId, principal.getUser());
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Location sharing stopped.");
+        return ResponseEntity.ok(response);
+    }
 }
+

@@ -24,6 +24,20 @@ public class BusLocation {
     private Double accuracy;
     private Double speed;
     private Double heading;
+
+    /**
+     * Who is currently providing this bus's live location.
+     * Values: "DRIVER", "ADMIN", "STUDENT"
+     * Null means legacy/unknown source (treated as DRIVER for priority purposes).
+     */
+    private String sourceType;
+
+    /**
+     * The userId of the current location source (User document ID).
+     * Used to identify which student is sharing when sourceType = "STUDENT".
+     * Not exposed publicly — frontend only sees sourceType.
+     */
+    private String sourceUserId;
     
     @LastModifiedDate
     private Instant updatedAt;
