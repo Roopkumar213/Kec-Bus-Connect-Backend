@@ -162,7 +162,16 @@ public class TripService {
                 .orElseThrow(() -> new ResourceNotFoundException("Trip not found: " + tripId));
 
         if (currentUser.getRole() != Role.ADMIN) {
-            if (trip.getDriverId() == null || !trip.getDriverId().equals(currentUser.getId())) {
+            boolean isAssignedDriver = false;
+            Optional<Bus> busOpt = busRepository.findById(trip.getBusId());
+            if (busOpt.isPresent()) {
+                Bus bus = busOpt.get();
+                if (currentUser.getId().equals(bus.getTrackerId())) {
+                    isAssignedDriver = true;
+                }
+            }
+
+            if (!isAssignedDriver && (trip.getDriverId() == null || !trip.getDriverId().equals(currentUser.getId()))) {
                 throw new BadRequestException("You are not authorized to stop this trip");
             }
         }

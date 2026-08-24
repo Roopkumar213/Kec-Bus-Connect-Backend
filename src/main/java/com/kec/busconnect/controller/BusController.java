@@ -52,6 +52,7 @@ public class BusController {
         details.put("trackerId", bus.getTrackerId());
         details.put("status", bus.getStatus());
         details.put("isActive", bus.isActive());
+        details.put("routeId", bus.getRouteId());
         details.put("route", route);
 
         return ResponseEntity.ok(details);
