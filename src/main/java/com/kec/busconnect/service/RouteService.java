@@ -27,7 +27,8 @@ public class RouteService {
 
     public Route getRouteById(String id) {
         return routeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Route not found with ID: " + id));
+                .or(() -> routeRepository.findByName(id))
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found with ID or name: " + id));
     }
 
     public Route createRoute(Route route) {
