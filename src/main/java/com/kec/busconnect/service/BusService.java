@@ -28,7 +28,8 @@ public class BusService {
 
     public Bus getBusById(String id) {
         return busRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Bus not found with ID: " + id));
+                .or(() -> busRepository.findByBusNumber(id))
+                .orElseThrow(() -> new ResourceNotFoundException("Bus not found with ID or number: " + id));
     }
 
     public Bus getBusByBusNumber(String busNumber) {
